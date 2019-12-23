@@ -45,29 +45,26 @@ public class TestNoErrorOnCompilerDirectives extends PositiveUseCase {
     super(null);
   }
 
-  private static final String CBL_WITHOUT_NUMBERS =
-      "  CBL DIR1,DIR2,DIR3,DIR4,DIR5,DIR6,DIR7,DIR8\r\n";
+  private static final String CBL_WITHOUT_NUMBERS = "  cbl LIB,QUOTE,NODYNAM,TEST(SEP)\r\n";
 
-  private static final String CBL_WITH_NUMBER =
-      "012345  CBL DIR1,DIR2,DIR3,DIR4,DIR5,DIR6,DIR7,DIR8\r\n";
+  private static final String CBL_WITH_NUMBER = "012345 CBL DATA(24),RMODE(24),NODYNAM\r\n";
 
-  private static final String PROCESS_WITHOUT_NUMBER =
-      "PROCESS DIR1,DIR2,DIR3,DIR4,DIR5,DIR6,DIR7,DIR8\r\n";
+  private static final String PROCESS_WITHOUT_NUMBER = "PROCESS DATA(24),RMODE(24),NODYNAM\r\n";
 
-  private static final String PROCESS_WITH_NUMBER =
-      "012345  PROCESS DIR1,DIR2,DIR3,DIR4,DIR5,DIR6,DIR7,DIR8\r\n";
+  private static final String PROCESS_WITH_NUMBER = "012345 PROCESS DATA(24),RMODE(24),NODYNAM\r\n";
 
-  private static final String PROCESS_WITHOUT_NUMBER_TYPO =
-      "PROESS DIR1,DIR2,DIR3,DIR4,DIR5,DIR6,DIR7,DIR8\r\n";
+  private static final String PROCESS_WITHOUT_NUMBER_TYPO = "PROESS DATA(24),RMODE(24),NODYNAM\r\n";
 
   private static final String PROCESS_WITH_NUMBER_TYPO =
-      "012345  PROESS DIR1,DIR2,DIR3,DIR4,DIR5,DIR6,DIR7,DIR8\r\n";
+      "012345 PROESS DATA(24),RMODE(24),NODYNAM\r\n";
 
   private static final String FOLLOWING_TEXT =
       "000000 Identification DIVISION.                                         23323232\r\n"
           + "002800 Program-ID.                                                      23323232\r\n"
           + "002800  HELLOWORLD.                                                     23323232\r\n"
           + "024200 PROCEDURE DIVISION .                                             CM1014.2\r\n";
+
+  private static final String COMMENT = "      * Comment\r\n";
 
   @Test
   public void testCorrectText() {
@@ -99,7 +96,6 @@ public class TestNoErrorOnCompilerDirectives extends PositiveUseCase {
     super.test();
   }
 
-  @Ignore("Feature is not yet supported")
   @Test
   public void testProcessWithoutNumbersWithTypo() {
     TestLanguageClient client =
@@ -109,11 +105,10 @@ public class TestNoErrorOnCompilerDirectives extends PositiveUseCase {
 
     Range range = retrieveRange(client);
 
-    assertEquals(1, range.getStart().getLine());
+    assertEquals(0, range.getStart().getLine());
     assertEquals(7, range.getStart().getCharacter());
   }
 
-  @Ignore("Feature is not yet supported")
   @Test
   public void testProcessWithNumbersWithTypo() {
     TestLanguageClient client =
@@ -123,20 +118,20 @@ public class TestNoErrorOnCompilerDirectives extends PositiveUseCase {
 
     Range range = retrieveRange(client);
 
-    assertEquals(1, range.getStart().getLine());
+    assertEquals(0, range.getStart().getLine());
     assertEquals(7, range.getStart().getCharacter());
   }
 
-  @Ignore("Feature is not yet supported")
+  @Ignore("Not yet implemented")
   @Test
   public void testLinesBeforeCblNotAllowed() {
-    TestLanguageClient client = startServerAndRunValidation(FOLLOWING_TEXT + CBL_WITH_NUMBER);
+    TestLanguageClient client = startServerAndRunValidation(COMMENT + CBL_WITH_NUMBER);
 
     waitForDiagnostics(client);
 
     Range range = retrieveRange(client);
 
-    assertEquals(4, range.getStart().getLine());
+    assertEquals(1, range.getStart().getLine());
     assertEquals(7, range.getStart().getCharacter());
   }
 
