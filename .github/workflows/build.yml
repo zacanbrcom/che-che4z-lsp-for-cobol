@@ -35,10 +35,9 @@ jobs:
           rm $HOME/.sonar/sonar-scanner.zip &&
           export PATH=$SONAR_SCANNER_HOME/bin:$PATH &&
           export SONAR_SCANNER_OPTS="-server" &&
-          sonar-scanner
-        -Dsonar.projectKey=eclipse_che-che4z-lsp-for-cobol -Dsonar.organization=eclipse -Dsonar.host.url=https://sonarcloud.io -Dsonar.login=${{ secrets.SONAR_TOKEN }} -Dsonar.branch.name=${{env.HEAD_BRANCH }}
-#        mvn sonar:sonar 
+#          sonar-scanner
 #        -Dsonar.projectKey=eclipse_che-che4z-lsp-for-cobol -Dsonar.organization=eclipse -Dsonar.host.url=https://sonarcloud.io -Dsonar.login=${{ secrets.SONAR_TOKEN }} -Dsonar.branch.name=${{env.HEAD_BRANCH }}
+mvn sonar:sonar -Dsonar.projectKey=eclipse_che-che4z-lsp-for-cobol -Dsonar.organization=eclipse -Dsonar.host.url=https://sonarcloud.io -Dsonar.login=${{ secrets.SONAR_TOKEN }} -Dsonar.branch.name=${{env.HEAD_BRANCH }}
 
 
     - run: cp com.ca.lsp.cobol/lsp-service-cobol/target/lsp-service-cobol-*.jar ${{matrix.extension}}/server/
