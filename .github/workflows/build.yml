@@ -26,7 +26,19 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: > 
-        mvn sonar:sonar -Dsonar.projectKey=eclipse_che-che4z-lsp-for-cobol -Dsonar.organization=eclipse -Dsonar.host.url=https://sonarcloud.io -Dsonar.login=${{ secrets.SONAR_TOKEN }} -Dsonar.branch.name=${{env.HEAD_BRANCH }}
+        export SONAR_SCANNER_VERSION=4.2.0.1873 &&
+          export SONAR_SCANNER_HOME=$HOME/.sonar/sonar-scanner-$SONAR_SCANNER_VERSION-linux &&
+          rm -rf $SONAR_SCANNER_HOME &&
+          mkdir -p $SONAR_SCANNER_HOME &&
+          curl -sSLo $HOME/.sonar/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$SONAR_SCANNER_VERSION-linux.zip &&
+          unzip $HOME/.sonar/sonar-scanner.zip -d $HOME/.sonar/ &&
+          rm $HOME/.sonar/sonar-scanner.zip &&
+          export PATH=$SONAR_SCANNER_HOME/bin:$PATH &&
+          export SONAR_SCANNER_OPTS="-server" &&
+          sonar-scanner
+        -Dsonar.projectKey=eclipse_che-che4z-lsp-for-cobol -Dsonar.organization=eclipse -Dsonar.host.url=https://sonarcloud.io -Dsonar.login=${{ secrets.SONAR_TOKEN }} -Dsonar.branch.name=${{env.HEAD_BRANCH }}
+#        mvn sonar:sonar 
+#        -Dsonar.projectKey=eclipse_che-che4z-lsp-for-cobol -Dsonar.organization=eclipse -Dsonar.host.url=https://sonarcloud.io -Dsonar.login=${{ secrets.SONAR_TOKEN }} -Dsonar.branch.name=${{env.HEAD_BRANCH }}
 
 
     - run: cp com.ca.lsp.cobol/lsp-service-cobol/target/lsp-service-cobol-*.jar ${{matrix.extension}}/server/
