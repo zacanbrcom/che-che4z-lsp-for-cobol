@@ -15,6 +15,8 @@
 package com.ca.lsp.core.cobol.visitor;
 
 import com.broadcom.lsp.domain.common.model.Position;
+import com.ca.lsp.core.cobol.model.DocumentHierarchyLevel;
+import com.ca.lsp.core.cobol.model.ExtendedDocument;
 import com.ca.lsp.core.cobol.model.SyntaxError;
 import com.ca.lsp.core.cobol.model.Variable;
 import com.ca.lsp.core.cobol.parser.CobolParserBaseVisitor;
@@ -22,10 +24,14 @@ import com.ca.lsp.core.cobol.semantics.SemanticContext;
 import com.ca.lsp.core.cobol.semantics.SubContext;
 import lombok.Getter;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.tree.ParseTree;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 
 import static com.ca.lsp.core.cobol.parser.CobolParser.*;
@@ -41,13 +47,66 @@ public class CobolVisitor extends CobolParserBaseVisitor<Class> {
   private static final int WARNING_LEVEL = 2;
   private static final int INFO_LEVEL = 3;
 
-  private String documentUri;
-  @Getter private SemanticContext semanticContext;
+  @Getter private SemanticContext semanticContext = new SemanticContext();
   @Getter private List<SyntaxError> errors = new ArrayList<>();
 
-  public CobolVisitor(String documentUri, SemanticContext semanticContext) {
+  private Deque<DocumentHierarchyLevel> documentHierarchyStack = new ArrayDeque<>();
+
+  private String documentUri;
+  private ExtendedDocument extendedDocument;
+
+  public CobolVisitor(String documentUri, ExtendedDocument extendedDocument) {
     this.documentUri = documentUri;
-    this.semanticContext = semanticContext;
+    this.extendedDocument = extendedDocument;
+    semanticContext.getCopybooks().merge(extendedDocument.getUsedCopybooks());
+    moveToNextLevel(documentUri, 0);
+  }
+
+  @Override
+  public Class visitDataDescriptionEntryCpy(DataDescriptionEntryCpyContext ctx) {
+    String cpyName =
+        ofNullable(ctx.IDENTIFIER())
+            .map(ParseTree::getText)
+            .orElse(ctx.getChildCount() > 1 ? ctx.getChild(1).getText() : "");
+    moveToNextLevel(cpyName, ctx.getStop().getTokenIndex() + 1);
+    return visitChildren(ctx);
+  }
+
+  @Override
+  public Class visitEnterCpy(EnterCpyContext ctx) {
+    String cpyName =
+        ofNullable(ctx.IDENTIFIER())
+            .map(ParseTree::getText)
+            .orElse(ctx.getChildCount() > 1 ? ctx.getChild(1).getText() : "");
+    moveToNextLevel(cpyName, ctx.getStop().getTokenIndex() + 1);
+    return visitChildren(ctx);
+  }
+
+  private void moveToNextLevel(String cpyName, int startingIndex) {
+    documentHierarchyStack.push(new DocumentHierarchyLevel(cpyName, startingIndex, 0));
+  }
+
+  @Override
+  public Class visitDataDescriptionExitCpy(DataDescriptionExitCpyContext ctx) {
+    moveToPreviousLevel();
+    return visitChildren(ctx);
+  }
+
+  @Override
+  public Class visitExitCpy(ExitCpyContext ctx) {
+    moveToPreviousLevel();
+    return visitChildren(ctx);
+  }
+
+  private void moveToPreviousLevel() {
+    DocumentHierarchyLevel passedCopybook = documentHierarchyStack.pop();
+    DocumentHierarchyLevel currentLevel = documentHierarchyStack.peek();
+    ofNullable(currentLevel)
+        .ifPresent(
+            it ->
+                it.addDelta(
+                    extendedDocument.getCopybookDeltas().get(passedCopybook.getName())
+                        + passedCopybook.getAccumulatedCopybookDelta()));
   }
 
   @Override
@@ -297,11 +356,15 @@ public class CobolVisitor extends CobolParserBaseVisitor<Class> {
   }
 
   private Position retrievePosition(ParserRuleContext ctx) {
-    return new Position(
-        documentUri,
-        ctx.getStart().getStartIndex(),
-        ctx.getStart().getStopIndex(),
-        ctx.getStart().getLine(),
-        ctx.getStart().getCharPositionInLine());
+    DocumentHierarchyLevel currentDocument = documentHierarchyStack.peek();
+    if (currentDocument == null) {
+      return null;
+    }
+    Token start = ctx.getStart();
+    int tokenIndex = start.getTokenIndex();
+    int shift = currentDocument.getStartingIndex();
+    List<Position> positions = extendedDocument.getTokenMapping().get(currentDocument.getName());
+    int index = tokenIndex - shift - currentDocument.getAccumulatedCopybookDelta();
+    return positions.get(index);
   }
 }

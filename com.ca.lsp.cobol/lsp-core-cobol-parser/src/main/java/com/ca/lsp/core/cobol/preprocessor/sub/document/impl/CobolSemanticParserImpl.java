@@ -15,7 +15,7 @@ package com.ca.lsp.core.cobol.preprocessor.sub.document.impl;
 
 import com.broadcom.lsp.domain.common.model.Position;
 import com.ca.lsp.core.cobol.model.CopybookUsage;
-import com.ca.lsp.core.cobol.model.PreprocessedInput;
+import com.ca.lsp.core.cobol.model.ExtendedDocument;
 import com.ca.lsp.core.cobol.model.ResultWithErrors;
 import com.ca.lsp.core.cobol.parser.*;
 import com.ca.lsp.core.cobol.parser.CobolPreprocessorParser.StartRuleContext;
@@ -47,7 +47,7 @@ public class CobolSemanticParserImpl implements CobolSemanticParser {
 
   @Nonnull
   @Override
-  public ResultWithErrors<PreprocessedInput> processLines(
+  public ResultWithErrors<ExtendedDocument> processLines(
       @Nonnull String uri,
       @Nonnull String code,
       @Nonnull Deque<CopybookUsage> copybookStack,
@@ -70,9 +70,9 @@ public class CobolSemanticParserImpl implements CobolSemanticParser {
 
     // analyze contained copy books
     return new ResultWithErrors<>(
-        new PreprocessedInput(
+        new ExtendedDocument(
             listener.context().read(),
-            listener.getSemanticContext(),
+            listener.getUsedCopybooks(),
             createTokenMapping(uri, code, listener.getInnerMappings()),
             listener.getCopybookDeltas()),
         listener.getErrors());

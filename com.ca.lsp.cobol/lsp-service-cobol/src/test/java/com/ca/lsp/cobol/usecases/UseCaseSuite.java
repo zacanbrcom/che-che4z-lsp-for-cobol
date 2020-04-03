@@ -32,6 +32,7 @@ import org.junit.runners.Suite.SuiteClasses;
   TestNoErrorOnCompilerDirectives.class,
   TestVariablesAreCaseInsensitive.class,
   TestRemarksSectionIsUnsupported.class,
+  TestMappingWithMultiDefinitions.class,
   TestMissingCopybooksReturnsError.class,
   TestResponsesNotContainLineBreaks.class,
   TestCorrectErrorUnderscorePosition.class,

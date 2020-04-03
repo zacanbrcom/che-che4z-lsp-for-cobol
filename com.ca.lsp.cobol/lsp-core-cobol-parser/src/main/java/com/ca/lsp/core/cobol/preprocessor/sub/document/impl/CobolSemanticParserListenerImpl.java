@@ -22,7 +22,8 @@ import com.ca.lsp.core.cobol.preprocessor.sub.document.CobolSemanticParserListen
 import com.ca.lsp.core.cobol.preprocessor.sub.document.CopybookResolution;
 import com.ca.lsp.core.cobol.preprocessor.sub.util.PreprocessorStringUtils;
 import com.ca.lsp.core.cobol.preprocessor.sub.util.impl.PreprocessorCleanerServiceImpl;
-import com.ca.lsp.core.cobol.semantics.SemanticContext;
+import com.ca.lsp.core.cobol.semantics.CobolNamedContext;
+import com.ca.lsp.core.cobol.semantics.SubContext;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.google.inject.assistedinject.Assisted;
@@ -53,7 +54,7 @@ public class CobolSemanticParserListenerImpl extends CobolPreprocessorBaseListen
   private static final String ERROR_SUGGESTION = "%s: Copybook not found";
 
   @Getter private final List<SyntaxError> errors = new ArrayList<>();
-  @Getter private final SemanticContext semanticContext = new SemanticContext();
+  @Getter private final SubContext<String> usedCopybooks = new CobolNamedContext();
   @Getter private final Map<String, List<Position>> innerMappings = new HashMap<>();
   @Getter private final Map<String, Integer> copybookDeltas = new HashMap<>();
 
@@ -190,17 +191,15 @@ public class CobolSemanticParserListenerImpl extends CobolPreprocessorBaseListen
     String copyBookContent = getCopyBookContent(copybookName, position);
 
     if (copyBookContent != null) {
-      context().write("*>CPYENTER " + copybookName + copyBookContent + " *>CPYEXIT" + NEWLINE);
+      context().write(" *>CPYENTER " + copybookName + copyBookContent + NEWLINE + " *>CPYEXIT ");
       context().replaceReplaceablesByReplacements(tokens);
     }
+    int copybookLength =
+        innerMappings.get(copybookName) != null ? innerMappings.get(copybookName).size() : 0;
+    int copybookDefinitionLength = ctx.getStop().getTokenIndex() - ctx.getStart().getTokenIndex();
+    int delta = copybookLength + 3 - copybookDefinitionLength;
 
-    if (innerMappings.get(copybookName) != null) {
-      int copybookLength = innerMappings.get(copybookName).size();
-      int copybookDefinitionLength = ctx.getStop().getTokenIndex() - ctx.getStart().getTokenIndex();
-      int delta = copybookLength - copybookDefinitionLength;
-
-      copybookDeltas.put(copybookName, delta);
-    }
+    copybookDeltas.put(copybookName, delta);
 
     String content = context().read();
     cleaner.pop();
@@ -243,17 +242,18 @@ public class CobolSemanticParserListenerImpl extends CobolPreprocessorBaseListen
     }
 
     copybookStack.push(new CopybookUsage(copybookName, null, position));
-    ResultWithErrors<PreprocessedInput> result =
+    ResultWithErrors<ExtendedDocument> result =
         preprocessor.process(
             copybook.getUri(), copybook.getContent(), copybookStack, textDocumentSyncType);
     errors.addAll(result.getErrors());
 
-    PreprocessedInput input = result.getResult();
+    ExtendedDocument input = result.getResult();
     innerMappings.putAll(input.getTokenMapping());
     copybookDeltas.putAll(input.getCopybookDeltas());
+    usedCopybooks.merge(input.getUsedCopybooks());
 
     copybookStack.pop();
-    return input.getInput();
+    return input.getText();
   }
 
   private void checkCopybookNameLength(String copybookName, Position position) {
@@ -328,7 +328,7 @@ public class CobolSemanticParserListenerImpl extends CobolPreprocessorBaseListen
     if (copybookName == null) {
       return;
     }
-    semanticContext.getCopybooks().addUsage(copybookName, position);
+    usedCopybooks.addUsage(copybookName, position);
   }
 
   @Nonnull
