@@ -16,7 +16,7 @@ import * as fs from "fs";
 import * as net from "net";
 import * as vscode from "vscode";
 import { LANGUAGE_ID } from "../constants";
-import {CancellationToken, ConfigurationParams, ConfigurationRequest, LanguageClient, LanguageClientOptions, StreamInfo} from "vscode-languageclient";
+import { CancellationToken, ConfigurationParams, ConfigurationRequest, LanguageClient, LanguageClientOptions, StreamInfo } from "vscode-languageclient";
 import { ConfigurationWorkspaceMiddleware } from "vscode-languageclient/lib/configuration";
 import { CopybooksPathGenerator } from "./CopybooksPathGenerator";
 import { JavaCheck } from "./JavaCheck";
@@ -51,10 +51,11 @@ export class LanguageClientService {
             params: ConfigurationParams,
             token: CancellationToken,
             next: ConfigurationRequest.HandlerSignature) => {
-
-            // TODO if request params are right
-            return (await this.copybooksPathGenerator.listUris()).map(uri => uri.toString());
-            // TODO else return next(params, token);
+            const result = await next(params, token);
+            if(Array.isArray(result)) {
+                result.push({"copybooks.paths" : (await this.copybooksPathGenerator.listUris()).map(uri => uri.toString())});
+            }
+            return result;
         };
         const configurationMiddleware: ConfigurationWorkspaceMiddleware = {
             configuration: signatureFunc,
