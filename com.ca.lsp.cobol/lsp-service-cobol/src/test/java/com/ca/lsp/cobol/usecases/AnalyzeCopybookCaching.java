@@ -71,7 +71,7 @@ public class AnalyzeCopybookCaching {
     when(preprocessor.process(any(), any(String.class), any(), any(String.class)))
         .thenReturn(
             new ResultWithErrors<>(
-                new ExtendedDocument(COPYBOOK_CONTENT, null, emptyMap(), emptyMap()),
+                new ExtendedDocument(COPYBOOK_CONTENT, null, emptyMap()),
                 emptyList()));
   }
 

@@ -26,6 +26,7 @@ import org.junit.runners.Suite.SuiteClasses;
   TestVaryingCorrect.class,
   AnalyzeCopybookCaching.class,
   TestPerformUntilCorrect.class,
+  TestMappingWIthReplacing.class,
   TestEndPerformCausesError.class,
   TestRemarksAreUnsupported.class,
   TestExtraneousInputEOFExpecting.class,

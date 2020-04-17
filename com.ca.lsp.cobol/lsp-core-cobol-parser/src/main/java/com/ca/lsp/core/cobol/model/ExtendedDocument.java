@@ -25,5 +25,4 @@ public class ExtendedDocument {
   private String text;
   private SubContext<String> usedCopybooks;
   private Map<String, List<Position>> tokenMapping;
-  private Map<String, Integer> copybookDeltas;
 }

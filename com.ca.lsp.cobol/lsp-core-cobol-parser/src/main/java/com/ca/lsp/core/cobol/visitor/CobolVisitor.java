@@ -29,12 +29,10 @@ import org.antlr.v4.runtime.tree.ParseTree;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.List;
+import java.util.*;
 
 import static com.ca.lsp.core.cobol.parser.CobolParser.*;
+import static java.util.Collections.emptyList;
 import static java.util.Optional.ofNullable;
 
 /**
@@ -59,7 +57,9 @@ public class CobolVisitor extends CobolParserBaseVisitor<Class> {
     this.documentUri = documentUri;
     this.extendedDocument = extendedDocument;
     semanticContext.getCopybooks().merge(extendedDocument.getUsedCopybooks());
-    moveToNextLevel(documentUri, 0);
+    documentHierarchyStack.push(
+        new DocumentHierarchyLevel(
+            documentUri, new ArrayList<>(extendedDocument.getTokenMapping().get(documentUri))));
   }
 
   @Override
@@ -68,7 +68,11 @@ public class CobolVisitor extends CobolParserBaseVisitor<Class> {
         ofNullable(ctx.IDENTIFIER())
             .map(ParseTree::getText)
             .orElse(ctx.getChildCount() > 1 ? ctx.getChild(1).getText() : "");
-    moveToNextLevel(cpyName, ctx.getStop().getTokenIndex() + 1);
+    documentHierarchyStack.push(
+        new DocumentHierarchyLevel(
+            cpyName,
+            new ArrayList<>(
+                ofNullable(extendedDocument.getTokenMapping().get(cpyName)).orElse(emptyList()))));
     return visitChildren(ctx);
   }
 
@@ -78,12 +82,12 @@ public class CobolVisitor extends CobolParserBaseVisitor<Class> {
         ofNullable(ctx.IDENTIFIER())
             .map(ParseTree::getText)
             .orElse(ctx.getChildCount() > 1 ? ctx.getChild(1).getText() : "");
-    moveToNextLevel(cpyName, ctx.getStop().getTokenIndex() + 1);
+    documentHierarchyStack.push(
+        new DocumentHierarchyLevel(
+            cpyName,
+            new ArrayList<>(
+                ofNullable(extendedDocument.getTokenMapping().get(cpyName)).orElse(emptyList()))));
     return visitChildren(ctx);
-  }
-
-  private void moveToNextLevel(String cpyName, int startingIndex) {
-    documentHierarchyStack.push(new DocumentHierarchyLevel(cpyName, startingIndex, 0));
   }
 
   @Override
@@ -99,14 +103,42 @@ public class CobolVisitor extends CobolParserBaseVisitor<Class> {
   }
 
   private void moveToPreviousLevel() {
-    DocumentHierarchyLevel passedCopybook = documentHierarchyStack.pop();
-    DocumentHierarchyLevel currentLevel = documentHierarchyStack.peek();
-    ofNullable(currentLevel)
-        .ifPresent(
-            it ->
-                it.addDelta(
-                    extendedDocument.getCopybookDeltas().get(passedCopybook.getName())
-                        + passedCopybook.getAccumulatedCopybookDelta()));
+    documentHierarchyStack.pop();
+  }
+
+  private Position retrievePosition(ParserRuleContext ctx) {
+    DocumentHierarchyLevel currentDocument = documentHierarchyStack.peek();
+    if (currentDocument == null) {
+      return null;
+    }
+    Token start = ctx.getStart();
+    List<Position> positions = currentDocument.getPositions();
+    Position position =
+        positions.stream()
+            .filter(it -> it.getToken().equals(start.getText()))
+            .findFirst()
+            .orElse(null);
+
+    int index = positions.indexOf(position);
+    if (index == -1) {
+
+      List<Position> initialPositions =
+          extendedDocument.getTokenMapping().get(currentDocument.getName());
+      int lenOfTail = initialPositions.size() - positions.size();
+      List<Position> subList = initialPositions.subList(0, lenOfTail);
+      Collections.reverse(subList);
+
+      position =
+          subList.stream()
+              .filter(it -> it.getToken().equals(start.getText()))
+              .findFirst()
+              .orElse(null);
+
+    } else {
+
+      currentDocument.setPositions(positions.subList(index + 1, positions.size()));
+    }
+    return position;
   }
 
   @Override
@@ -353,18 +385,5 @@ public class CobolVisitor extends CobolParserBaseVisitor<Class> {
 
   private static int getWrongTokenStopPosition(String wrongToken, int charPositionInLine) {
     return charPositionInLine + wrongToken.length() - 1;
-  }
-
-  private Position retrievePosition(ParserRuleContext ctx) {
-    DocumentHierarchyLevel currentDocument = documentHierarchyStack.peek();
-    if (currentDocument == null) {
-      return null;
-    }
-    Token start = ctx.getStart();
-    int tokenIndex = start.getTokenIndex();
-    int shift = currentDocument.getStartingIndex();
-    List<Position> positions = extendedDocument.getTokenMapping().get(currentDocument.getName());
-    int index = tokenIndex - shift - currentDocument.getAccumulatedCopybookDelta();
-    return positions.get(index);
   }
 }

@@ -102,7 +102,7 @@ public class TestMappingWithMultiDefinitions {
                 new CobolText("NESTED2", NESTED2),
                 new CobolText("PARS", PARS)));
 
-    //    assertDiagnostics(result.getDiagnostics());
+    assertDiagnostics(result.getDiagnostics());
     assertCopybookUsages(result.getCopybookUsages());
 
     assertVariableDefinitions(result.getVariableDefinitions());

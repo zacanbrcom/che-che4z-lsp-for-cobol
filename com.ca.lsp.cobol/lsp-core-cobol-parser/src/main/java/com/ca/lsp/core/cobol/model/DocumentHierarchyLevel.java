@@ -15,17 +15,16 @@
 
 package com.ca.lsp.core.cobol.model;
 
+import com.broadcom.lsp.domain.common.model.Position;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+
+import java.util.List;
 
 @Data
 @AllArgsConstructor
 public class DocumentHierarchyLevel {
   private final String name;
-  private final int startingIndex;
-  private int accumulatedCopybookDelta;
+  private List<Position> positions;
 
-  public void addDelta(int delta) {
-    accumulatedCopybookDelta += delta;
-  }
 }
