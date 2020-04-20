@@ -197,7 +197,7 @@ public class CobolSemanticParserListenerImpl extends CobolPreprocessorBaseListen
                   .replaceAll("[^a-zA-Z0-9]+", "")
                   .trim();
 
-      cleaner.context().write(copybookWithReplacingName);
+      cleaner.context().write(copybookWithReplacingName + ". ");
       cleaner.push();
       for (ReplacingPhraseContext replacingPhrase : replacingPhraseContexts) {
         cleaner.context().storeReplaceablesAndReplacements(replacingPhrase.replaceClause());
@@ -207,7 +207,7 @@ public class CobolSemanticParserListenerImpl extends CobolPreprocessorBaseListen
       cleaner.context().replaceReplaceablesByReplacements(tokens);
       List<Position> tokenMapping = createTokenMapping(copybookName, cleaner.context().read());
       innerMappings.put(copybookWithReplacingName, tokenMapping);
-      cleaner.context().write(NEWLINE + " *>CPYEXIT ");
+      cleaner.context().write(NEWLINE + " *>CPYEXIT. ");
 
     } else {
       cleaner.push();
@@ -246,7 +246,7 @@ public class CobolSemanticParserListenerImpl extends CobolPreprocessorBaseListen
   }
 
   private void writeCopybookContent(String copybookName, String copyBookContent) {
-    cleaner.context().write(copybookName + copyBookContent + NEWLINE + " *>CPYEXIT ");
+    cleaner.context().write(copybookName + ". " + copyBookContent + NEWLINE + " *>CPYEXIT. ");
   }
 
   private String getCopyBookContent(String copybookName, Position position) {

@@ -46,7 +46,7 @@ public class TestMappingWithMultiDefinitions {
           + "       01 PARENT2. COPY STRUC.\r\n"
           + "       COPY WITHNEST.\r\n"
           + "       PROCEDURE DIVISION.\r\n"
-          + "       PERFORM MAINLINE.\r\n"
+          + "       PERFORM MAIN-LINE.\r\n"
           + "       COPY PARS.\r\n"
           + "       MAIN-LINE.\r\n"
           + "           MOVE 00 TO CHILD2 OF PARENT.\r\n"
@@ -91,6 +91,8 @@ public class TestMappingWithMultiDefinitions {
 
   @Test
   public void test() {
+    System.out.println("mama");
+
     AnalysisResult result =
         analyze(
             DOCUMENT,
@@ -140,8 +142,8 @@ public class TestMappingWithMultiDefinitions {
   }
 
   private void assertParagraphUsages(Map<String, List<Location>> paragraphUsages) {
-    assertEquals("Paragraph usages: " + paragraphUsages.toString(), 1, paragraphUsages.size());
-    assertSingleLocation(paragraphUsages, "PAR1", DOCUMENT_URI, 14, 19);
+    assertEquals("Paragraph usages: " + paragraphUsages.toString(), 2, paragraphUsages.size());
+    assertSingleLocation(paragraphUsages, "PAR1", DOCUMENT_URI, 13, 19);
     assertSingleLocation(paragraphUsages, "MAIN-LINE", DOCUMENT_URI, 8, 15);
   }
 
@@ -151,7 +153,7 @@ public class TestMappingWithMultiDefinitions {
         2,
         paragraphDefinitions.size());
     assertSingleLocation(paragraphDefinitions, "PAR1", "PARS", 0, 7);
-    assertSingleLocation(paragraphDefinitions, "MAIN-LINE", DOCUMENT_URI, 9, 7);
+    assertSingleLocation(paragraphDefinitions, "MAIN-LINE", DOCUMENT_URI, 10, 7);
   }
 
   private void assertVariableUsages(Map<String, List<Location>> variableUsages) {
