@@ -27,8 +27,6 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.util.*;
 
 import static com.ca.lsp.core.cobol.parser.CobolParser.*;
@@ -198,19 +196,6 @@ public class CobolVisitor extends CobolParserBaseVisitor<Class> {
   }
 
   @Override
-  public Class visitQualifiedDataNameFormat1(QualifiedDataNameFormat1Context ctx) {
-    if (ctx.dataName() != null) {
-      String variable = ctx.dataName().getText().toUpperCase();
-      checkForVariable(
-          variable,
-          ctx.getStart().getLine(),
-          ctx.dataName().getStart().getCharPositionInLine(),
-          ctx);
-    }
-    return visitChildren(ctx);
-  }
-
-  @Override
   public Class visitParagraphName(ParagraphNameContext ctx) {
     semanticContext.getParagraphs().define(ctx.getText().toUpperCase(), retrievePosition(ctx));
     return visitChildren(ctx);
@@ -218,85 +203,105 @@ public class CobolVisitor extends CobolParserBaseVisitor<Class> {
 
   @Override
   public Class visitDataDescriptionEntryFormat1(DataDescriptionEntryFormat1Context ctx) {
-    createVariableAndDefine(ctx);
+
+    String levelNumber = ctx.otherLevel().getText();
+    ofNullable(ctx.dataName1())
+        .ifPresent(
+            variable ->
+                defineVariable(levelNumber, variable.getText(), retrievePosition(variable)));
     return visitChildren(ctx);
   }
 
   @Override
   public Class visitDataDescriptionEntryFormat2(DataDescriptionEntryFormat2Context ctx) {
-    createVariableAndDefine(ctx);
+
+    String levelNumber = ctx.LEVEL_NUMBER_66().getText();
+    ofNullable(ctx.dataName1())
+        .ifPresent(
+            variable ->
+                defineVariable(levelNumber, variable.getText(), retrievePosition(variable)));
     return visitChildren(ctx);
   }
 
   @Override
   public Class visitDataDescriptionEntryFormat3(DataDescriptionEntryFormat3Context ctx) {
-    createVariableAndDefine(ctx);
-    return visitChildren(ctx);
-  }
-
-  private void createVariableAndDefine(@Nonnull ParserRuleContext ctx) {
-    String levelNumber;
-
-    if (ctx instanceof DataDescriptionEntryFormat1Context) {
-      DataDescriptionEntryFormat1Context ctxDataDescF1 = (DataDescriptionEntryFormat1Context) ctx;
-      levelNumber = ctxDataDescF1.otherLevel().getText();
-      defineVariableIfPresent(levelNumber, ctxDataDescF1.dataName1());
-
-    } else if (ctx instanceof DataDescriptionEntryFormat2Context) {
-      DataDescriptionEntryFormat2Context ctxDataDescF2 = (DataDescriptionEntryFormat2Context) ctx;
-      levelNumber = ctxDataDescF2.LEVEL_NUMBER_66().getText();
-      defineVariableIfPresent(levelNumber, ctxDataDescF2.dataName1());
-    } else {
-      DataDescriptionEntryFormat3Context ctxDataDescF3 = (DataDescriptionEntryFormat3Context) ctx;
-      levelNumber = ctxDataDescF3.LEVEL_NUMBER_88().getText();
-      defineVariableIfPresent(levelNumber, ctxDataDescF3.dataName1());
-    }
-  }
-
-  private void defineVariableIfPresent(
-      @Nullable String levelNumber, @Nullable DataName1Context dataName) {
-    ofNullable(dataName)
+    String levelNumber = ctx.LEVEL_NUMBER_88().getText();
+    ofNullable(ctx.dataName1())
         .ifPresent(
             variable ->
-                semanticContext
-                    .getVariables()
-                    .define(
-                        new Variable(levelNumber, variable.getText()), retrievePosition(dataName)));
+                defineVariable(levelNumber, variable.getText(), retrievePosition(variable)));
+    return visitChildren(ctx);
+  }
+
+  private void defineVariable(String level, String name, Position position) {
+    semanticContext.getVariables().define(new Variable(level, name), position);
     semanticContext.getVariables().createRelationBetweenVariables();
-  }
-
-  public Class visitDataName2(
-      DataName2Context ctx, String child, int childStartLine, int childPositionInLine) {
-    if (checkForVariable(
-        ctx.getText(), ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine(), null)) {
-      checkParentContainsChildren(ctx.getText(), child, childStartLine, childPositionInLine);
-    }
-    return visitChildren(ctx);
-  }
-
-  public Class visitInData(
-      String child, int childStartLine, int childPositionInLine, InDataContext ctx) {
-    checkForDataName2(ctx.dataName2(), child, childStartLine, childPositionInLine);
-    return visitChildren(ctx);
-  }
-
-  public Class visitInTable(
-      String child, int childStartLine, int childPositionInLine, InTableContext ctx) {
-    checkForDataName2(ctx.tableCall().dataName2(), child, childStartLine, childPositionInLine);
-    return visitChildren(ctx);
   }
 
   @Override
   public Class visitParagraphNameUsage(ParagraphNameUsageContext ctx) {
-    addUsage(semanticContext.getParagraphs(), ctx);
+    Position position = retrievePosition(ctx);
+    String name = ctx.getText().toUpperCase();
+    addUsage(semanticContext.getParagraphs(), name, position);
     return visitChildren(ctx);
   }
 
-  private void checkForDataName2(
-      DataName2Context ctx, String child, int childStartLine, int childPositionInLine) {
-    if (ctx != null) {
-      visitDataName2(ctx, child, childStartLine, childPositionInLine);
+  @Override
+  public Class visitQualifiedDataNameFormat1(QualifiedDataNameFormat1Context ctx) {
+    ofNullable(ctx.dataName())
+        .map(it -> it.getText().toUpperCase())
+        .ifPresent(variable -> checkForVariable(variable, ctx));
+    return visitChildren(ctx);
+  }
+
+  private void checkForVariable(String variable, QualifiedDataNameFormat1Context ctx) {
+    Position variablePosition = retrievePosition(ctx);
+    if (!semanticContext.getVariables().contains(variable)) {
+      reportVariableNotDefined(variable, variablePosition);
     }
+    addUsage(semanticContext.getVariables(), variable, variablePosition);
+
+    if (ctx.qualifiedInData() != null) {
+      iterateOverQualifiedDataNames(ctx, variable, variablePosition);
+    }
+  }
+
+  private void iterateOverQualifiedDataNames(
+      QualifiedDataNameFormat1Context ctx, String variable, Position variablePosition) {
+    for (QualifiedInDataContext node : ctx.qualifiedInData()) {
+      DataName2Context context = getDataName2Context(node);
+
+      String parent = context.getText().toUpperCase();
+      checkVariableStructure(parent, variable, variablePosition);
+      Position parentPosition = retrievePosition(context);
+      variable = parent;
+      addUsage(semanticContext.getVariables(), variable, parentPosition);
+    }
+  }
+
+  private DataName2Context getDataName2Context(QualifiedInDataContext node) {
+    return node.inData() == null
+        ? node.inTable().tableCall().dataName2()
+        : node.inData().dataName2();
+  }
+
+  private void checkVariableStructure(String parent, String child, Position position) {
+    if (!semanticContext.getVariables().parentContainsSpecificChild(parent, child)) {
+      reportVariableNotDefined(child, position);
+    }
+  }
+
+  private void addUsage(SubContext<?> langContext, String name, Position position) {
+    langContext.addUsage(name.toUpperCase(), position);
+  }
+
+  private void reportVariableNotDefined(String variable, Position position) {
+    errors.add(
+        SyntaxError.syntaxError()
+            .position(position)
+            .suggestion("Invalid definition for: " + variable)
+            .severity(INFO_LEVEL)
+            .build());
   }
 
   private void throwWarning(String wrongToken, int startLine, int charPositionInLine) {
@@ -304,21 +309,6 @@ public class CobolVisitor extends CobolParserBaseVisitor<Class> {
         .ifPresent(
             correctWord ->
                 getSemanticError(wrongToken, startLine, charPositionInLine, correctWord));
-  }
-
-  private void throwSuggestion(String wrongToken, int startLine, int charPositionInLine) {
-    errors.add(
-        SyntaxError.syntaxError()
-            .position(
-                new Position(
-                    documentUri,
-                    charPositionInLine,
-                    getWrongTokenStopPosition(wrongToken, charPositionInLine),
-                    startLine,
-                    charPositionInLine))
-            .suggestion("Invalid definition for: " + wrongToken)
-            .severity(INFO_LEVEL)
-            .build());
   }
 
   private void getSemanticError(
@@ -335,52 +325,6 @@ public class CobolVisitor extends CobolParserBaseVisitor<Class> {
             .suggestion("A misspelled word, maybe you want to put " + correctWord)
             .severity(WARNING_LEVEL)
             .build());
-  }
-
-  private boolean checkForVariable(
-      String variable, int startLine, int charPositionInLine, ParserRuleContext ctx) {
-    if (!semanticContext.getVariables().contains(variable)) {
-      throwSuggestion(variable, startLine, charPositionInLine);
-      return false;
-    } else if (ctx instanceof QualifiedDataNameFormat1Context
-        && ((QualifiedDataNameFormat1Context) ctx).qualifiedInData() != null) {
-      addUsage(semanticContext.getVariables(), variable, ctx);
-      iterateOverQualifiedDataNames(
-          (QualifiedDataNameFormat1Context) ctx, variable, startLine, charPositionInLine);
-    }
-    return true;
-  }
-
-  private void iterateOverQualifiedDataNames(
-      QualifiedDataNameFormat1Context ctx, String variable, int startLine, int charPositionInLine) {
-    for (QualifiedInDataContext node : ctx.qualifiedInData()) {
-      if (node.inData() != null) {
-        visitInData(variable, startLine, charPositionInLine, node.inData());
-        DataName2Context context = node.inData().dataName2();
-        variable = context.getText();
-        addUsage(semanticContext.getVariables(), context);
-      } else {
-        visitInTable(variable, startLine, charPositionInLine, node.inTable());
-        DataName2Context context = node.inTable().tableCall().dataName2();
-        variable = context.getText();
-        addUsage(semanticContext.getVariables(), context);
-      }
-    }
-  }
-
-  private void checkParentContainsChildren(
-      String parent, String children, int startLine, int charPositionInLine) {
-    if (!semanticContext.getVariables().parentContainsSpecificChild(parent, children)) {
-      throwSuggestion(children, startLine, charPositionInLine);
-    }
-  }
-
-  private void addUsage(SubContext<?> langContext, String name, ParserRuleContext ctx) {
-    langContext.addUsage(name.toUpperCase(), retrievePosition(ctx));
-  }
-
-  private void addUsage(SubContext<?> langContext, ParserRuleContext ctx) {
-    langContext.addUsage(ctx.getText().toUpperCase(), retrievePosition(ctx));
   }
 
   private static int getWrongTokenStopPosition(String wrongToken, int charPositionInLine) {
