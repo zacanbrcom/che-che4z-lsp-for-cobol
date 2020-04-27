@@ -111,6 +111,18 @@ pipeline {
                 }
             }
         }
+        stage('Client - Build Test Reports') {
+            environment {
+                npm_config_cache = "$env.WORKSPACE"
+            }
+            steps {
+                container('node') {
+                    dir('clients/cobol-lsp-vscode-extension') {
+                        sh 'npm t'
+                    }
+                }
+            }
+        }
         stage('Deploy') {
             environment {
                 sshChe4z = "genie.che4z@projects-storage.eclipse.org"
