@@ -15,46 +15,51 @@
 
 package com.ca.lsp.cobol.usecases;
 
+import com.ca.lsp.cobol.positive.CobolText;
 import com.ca.lsp.cobol.service.delegates.validations.AnalysisResult;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.Location;
-import org.eclipse.lsp4j.Position;
-import org.eclipse.lsp4j.Range;
 import org.junit.Test;
 
 import java.util.List;
 import java.util.Map;
 
 import static com.ca.lsp.cobol.service.delegates.validations.UseCaseUtils.*;
-import static org.eclipse.lsp4j.DiagnosticSeverity.Information;
+import static java.util.Collections.singletonList;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 
 /**
- * This test checks that parser can find and underline an incorrect variable structure. Here CHILD1
- * is not a part of PARENT1 because they are on the same level, but on the line 8 they called the
- * way if CHILD1 was a part of PARENT1 structure. It is incorrect, so CHILD1 should be underlined.
+ * This test checks that there is no syntax error shown on a copybook usage when the copybook name
+ * is a keyword (DETAIL in this case).
  */
-public class TestInvalidVariableStructureFound {
+public class TestKeywordAsCopybookNotProducesNPE {
+
   private static final String TEXT =
       "0      Identification Division. \n"
           + "1      Program-id.    ProgramId.\n"
           + "2      Data Division.\n"
           + "3      Working-Storage Section.\n"
           + "4      01   PARENT1. \n"
-          + "5      01   CHILD1 PIC 9. \n"
+          + "5       COPY DETAIL. \n"
           + "6      Procedure Division.\n"
           + "7      000-Main-Logic.\n"
-          + "8          MOVE 0 TO CHILD1 OF PARENT1.\n"
+          + "8          DISPLAY CHILD1 OF PARENT1.\n"
           + "9      End program ProgramId.";
 
-  private static final String CHILD1 = "CHILD1";
-  private static final String PARENT1 = "PARENT1";
+  private static final String DETAIL =
+      "           03  CHILD1         PIC 9   VALUE IS '0'.\n"
+          + "           03  CHILD2         PIC 9   VALUE IS '1'.";
+
+  private static final String DETAIL_NAME = "DETAIL";
+
   private static final String MAIN_LOGIC = "000-MAIN-LOGIC";
+  private static final String PARENT1 = "PARENT1";
+  private static final String CHILD1 = "CHILD1";
+  private static final String CHILD2 = "CHILD2";
 
   @Test
   public void test() {
-    AnalysisResult result = analyze(TEXT);
+    AnalysisResult result = analyze(TEXT, singletonList(new CobolText(DETAIL_NAME, DETAIL)));
     assertDiagnostics(result.getDiagnostics());
 
     assertCopybookUsages(result.getCopybookUsages());
@@ -68,14 +73,7 @@ public class TestInvalidVariableStructureFound {
   }
 
   private void assertDiagnostics(List<Diagnostic> diagnostics) {
-    assertEquals("Diagnostics: " + diagnostics.toString(), 1, diagnostics.size());
-
-    Diagnostic invalidChild1 = diagnostics.get(0);
-    assertEquals("Invalid definition for: CHILD1", invalidChild1.getMessage());
-    assertEquals(new Range(new Position(8, 21), new Position(8, 27)), invalidChild1.getRange());
-    assertEquals(Information, invalidChild1.getSeverity());
-    assertEquals("COBOL Language Support - I", invalidChild1.getSource());
-    assertNull(invalidChild1.getCode());
+    assertEquals("Diagnostics: " + diagnostics.toString(), 0, diagnostics.size());
   }
 
   private void assertParagraphUsages(Map<String, List<Location>> usages) {
@@ -94,24 +92,31 @@ public class TestInvalidVariableStructureFound {
   }
 
   private void assertCopybookUsages(Map<String, List<Location>> copybookUsages) {
-    assertEquals("Copybook usages: " + copybookUsages.toString(), 0, copybookUsages.size());
+    assertEquals("Copybook usages: " + copybookUsages.toString(), 1, copybookUsages.size());
+    assertNumberOfLocations(copybookUsages, DETAIL_NAME, 1);
+    assertLocation(copybookUsages, DETAIL_NAME, DOCUMENT_URI, 5, 13);
   }
 
   private void assertVariableDefinitions(Map<String, List<Location>> definitions) {
-    assertEquals("Variable definitions: " + definitions.toString(), 2, definitions.size());
+    assertEquals("Variable definitions: " + definitions.toString(), 3, definitions.size());
 
     assertNumberOfLocations(definitions, PARENT1, 1);
     assertLocation(definitions, PARENT1, DOCUMENT_URI, 4, 12);
+
     assertNumberOfLocations(definitions, CHILD1, 1);
-    assertLocation(definitions, CHILD1, DOCUMENT_URI, 5, 12);
+    assertLocation(definitions, CHILD1, DETAIL_NAME, 0, 15);
+
+    assertNumberOfLocations(definitions, CHILD2, 1);
+    assertLocation(definitions, CHILD2, DETAIL_NAME, 1, 15);
   }
 
   private void assertVariableUsages(Map<String, List<Location>> usages) {
     assertEquals("Variable usages: " + usages.toString(), 2, usages.size());
 
     assertNumberOfLocations(usages, PARENT1, 1);
-    assertLocation(usages, PARENT1, DOCUMENT_URI, 8, 31);
+    assertLocation(usages, PARENT1, DOCUMENT_URI, 8, 29);
+
     assertNumberOfLocations(usages, CHILD1, 1);
-    assertLocation(usages, CHILD1, DOCUMENT_URI, 8, 21);
+    assertLocation(usages, CHILD1, DOCUMENT_URI, 8, 19);
   }
 }
